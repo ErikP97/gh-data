@@ -26,7 +26,7 @@ jobs:
       - name: Build website
         run: npm run build
       - name: Publish JS filename
-        run: find dist/assets/*.js -type f -execdir echo '{}' ';'
+        run: find dist/assets/*.js -type f -execdir echo '::set-output name=script-file::{}' ';'
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -42,5 +42,7 @@ jobs:
           name: dist-files
       - name: Output contents of dist directory
         run: ls
+      - name: Output filename
+        run: echo "${{needs.build.outputs.script-file}}"
       - name: Deploy
         run: echo "Deploying..."
