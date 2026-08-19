@@ -1,18 +1,23 @@
+# Advanced GitHub Actions workflow demonstrating best practices
+# Demonstrates: caching dependencies, job outputs, artifact management, and passing data between jobs
 name: Deploy website
 on:
   push:
     branches:
-      - master
+      - master  # Only triggers when code is pushed to the master branch
 jobs:
+  # Job 1: Test - lints and tests the code
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Get code
         uses: actions/checkout@v7
       - name: Cache Dependencies
+        # Caches npm dependencies to speed up subsequent runs
         uses: actions/cache@v6
         with:
           path: ~/.npm
+          # Cache key changes if package-lock.json changes, forcing a fresh install
           key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
       - name: Install dependencies
         run: npm ci
@@ -20,11 +25,13 @@ jobs:
         run: npm run lint
       - name: Test code
         run: npm run test
+  # Job 2: Build - compiles the website after tests pass
   build:
-    needs: test
+    needs: test  # Waits for test job to complete successfully
     runs-on: ubuntu-latest
+    # Job outputs allow passing data to dependent jobs
     outputs:
-      script-file: ${{ steps.publish.outputs.script-file }}
+      script-file: ${{ steps.publish.outputs.script-file }}  # Captures the JS filename to use in deploy job
     steps:
       - name: Get code
         uses: actions/checkout@v7
@@ -38,24 +45,29 @@ jobs:
       - name: Build website
         run: npm run build
       - name: Publish JS filename
-        id: publish
+        id: publish  # Step ID allows referencing this step's outputs in other jobs
+        # Writes output that can be accessed as needs.build.outputs.script-file
         run: find dist/assets/*.js -type f -execdir echo 'script-file= {}' >> $GITHUB_OUTPUT ';'
       - name: Upload build artifacts
+        # Saves build files for use in the deploy job
         uses: actions/upload-artifact@v7
         with:
-          name: dist-files
-          path: dist
+          name: dist-files  # Artifact name (used to download in deploy job)
+          path: dist        # Directory to upload
+  # Job 3: Deploy - deploys the built website
   deploy:
-    needs: build
+    needs: build  # Waits for build job to complete
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
+        # Retrieves the artifact uploaded by the build job
         uses: actions/download-artifact@v7
         with:
-          name: dist-files
+          name: dist-files  # Must match the artifact name from build job
       - name: Output contents of dist directory
         run: ls
       - name: Output filename
+        # Accesses output from the build job using needs.<job-name>.outputs.<output-name>
         run: echo "${{ needs.build.outputs.script-file }}"
       - name: Deploy
         run: echo "Deploying..."
